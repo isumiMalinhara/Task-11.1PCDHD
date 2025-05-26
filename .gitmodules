@@ -1,0 +1,9 @@
+[submodule "components/spiffs"]
+	path = components/spiffs
+	url = https://github.com/pellepl/spiffs.git
+[submodule "components/cJSON"]
+	path = components/cJSON
+	url = https://github.com/DaveGamble/cJSON.git
+[submodule "esp-idf"]
+	path = esp-idf
+	url = https://github.com/espressif/esp-idf.git
