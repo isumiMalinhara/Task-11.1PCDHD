@@ -1,214 +1,111 @@
-# ESP32 Sniffer
+# ESP32-Based Wi-Fi Probe Sniffer for Ethical Penetration Testing
 
-<p align="center">
-  <img alt="ETS" src="https://user-images.githubusercontent.com/25306548/70620809-7a028600-1c18-11ea-939c-5358bb2c61f7.png" height="140" />
-  <p align="center">
-    <a href=""><img alt="Software License" src="https://img.shields.io/cran/l/devtools"></a>
-    <a href="https://youtu.be/NMywky9Ts_w"><img alt="Demo" src="https://img.shields.io/badge/demo-youtube-blue.svg"></a>
-    <a href="https://twitter.com/giannofederico"><img alt="Twitter" src="https://img.shields.io/twitter/follow/giannofederico.svg?style=social&label=Follow"></a>
-  </p>
-</p>
+## Introduction
 
-This project is using [Espressif IoT Development Framework](https://github.com/espressif/esp-idf) (ESP-IDF) and has been tested on ESP-WROOM-32 module and esp-idf `v3.2`.
+This project proposes the development of a compact, real-time Wi-Fi probe sniffer using the ESP32-Dev Module. Designed for educational and ethical penetration testing purposes, this tool passively captures and logs probe request packets to demonstrate the potential security vulnerabilities of Wi-Fi-enabled devices. It serves as an accessible, cost-effective entry point into wireless network security and embedded system design.
 
-An overview of the full project (i.e. ESP32 firmware, server and GUI) can be found [here](https://j4nn0.github.io/doc/ets_presentation.pdf).
+## Problem Domain
 
-This firmware is written with the purpose to sniff Probe Request packets sent by smartphones that are looking for Wi-Fi connection. When the Wi-Fi connection is active on a smartphone, it will send in broadcast (in all channels frequencies) a probe request messagge asking if there are any free Wi-Fi or some known ones (i.e. the smartphone knows the password for that Wi-Fi). The ESP32 will sniff it and extract different types of information.
+Wireless networks form the backbone of modern connectivity, enabling seamless communication in homes, businesses, academic institutions, and public spaces. However, the inherent openness of radio communication introduces serious security risks. The broadcast nature of Wi-Fi means that any nearby device can capture the signals, making it vulnerable to various forms of cyberattacks such as:
 
-The following information is taken from each sniffed packet:
+- **Eavesdropping**
+- **Rogue access points**
+- **Deauthentication attacks**
+- **Man-in-the-middle (MITM) attacks**
 
-- MAC of the smartphone that has sent the request
-- SSID of the wifi to which the request is sent
-- The Timestamp of when the request was sent
-- Received Signal Strength Indicator (RSSI)
-- Sequence Number (SN)
-- HT Capabilities Info
+These vulnerabilities often arise from configuration errors, reliance on deprecated protocols, or limited monitoring capabilities. While professionals rely on tools like Wireshark or specialized commercial hardware for packet analysis, such resources are often expensive, complex, and inaccessible to students and hobbyists.
 
-After each minute these informations are sent to a [server](https://github.com/ETS-PoliTO/ETS-Server) and processed. Finally, it is possible to see the processed informations (smartphones real time location, smartphone frequency, etc.) through a [GUI](https://github.com/ETS-PoliTO/GUI-Application).
+### Challenges in Current Industry Practices
 
-### Demo 
-[![Watch the video](https://img.youtube.com/vi/NMywky9Ts_w/maxresdefault.jpg)](https://youtu.be/NMywky9Ts_w)
+- High cost of commercial Wi-Fi monitoring tools and adapters
+- Steep learning curve for open-source tools with limited embedded compatibility
+- Lack of simple, self-contained systems for educational environments
+- Demand for portable, field-deployable tools in ethical hacking scenarios
 
-# Table of Contents
-- [Firmware Overview](#firmware-overview)
-- [ESP-IDF Environment Configuration](#esp-idf-environment-configuration)
-- [Usage](#usage)
-- [File Configuration](#file-configuration)
-    - [Variables Configuration](#variables-configuration)
-    - [Add Customised Menu](#add-customised-menu)
-- [Components](#components)
-- [Resources](#resources)
+## Embedded Systems as a Viable Solution
 
-# Firmware Overview
+The ESP32-Dev Module addresses these challenges with its built-in Wi-Fi capabilities, affordability, and robust developer ecosystem. One standout feature is **promiscuous mode**, which enables the ESP32 to receive all Wi-Fi packets on a channel regardless of their destination. This makes it possible to detect probe requests—packets sent by devices actively scanning for known Wi-Fi networks.
 
-The firmware consits in two main threads/tasks:
+By leveraging this capability, we can build a functional Wi-Fi sniffer that logs probe requests, helping users understand the real-world implications of passive wireless data collection. This proof-of-concept is particularly relevant for ethical hackers, cybersecurity students, and researchers interested in IoT security.
 
-- Sniffer Task
-    
-    - Sniff Probe Request packet and save infomation described above into a file.
+## System Design Overview
 
-- Wi-Fi Task
+### Key Hardware Components
 
-    - Each minute, take the information saved by the **Sniffer Task** and send it to the server.
-    - A `lock` is used in order to manage critical section for I/O operations in the file.
+- **ESP32-Dev Module**: The core microcontroller handling Wi-Fi sniffing and processing
+- **USB Cable**: Provides power and enables communication for debugging and programming
+- **OLED Display (Optional)**: Displays detected MAC addresses and device counts in real-time
+- **Computer/Smartphone**: For viewing output via serial console or hosted web interface
 
-The ESP32 is configured in `WIFI_MODE_APSTA` mode: i.e. it creates "*soft-AP and station control block*" and starts "*soft-AP and station*". Thanks to this, the ESP32 is able to sniff and send informations to the server at the same time avoiding to lose packets information while sending data.
+### Communication Protocols
 
-Here is the full list of information fields that can be in a Probe Request (source IEEE 802.11-2012):
+- **IEEE 802.11**: Captures Wi-Fi packets in monitor mode
+- **UART**: Sends output to a PC via serial interface
+- **HTTP (Optional)**: Hosts a basic web dashboard for real-time monitoring
 
-![cwap-probe-10](https://user-images.githubusercontent.com/25306548/134971992-9df8ba5c-b93c-4d83-b12f-0f991b4ddbeb.png)
+### User Interface Options
 
-And here below a packet sniffed with Wireshark in which you can see, for each field, the number of bits and their position within the packet:
+- **Serial Terminal**: Basic output of MAC addresses and probe data
+- **OLED Display (Optional)**: Live on-device feedback
+- **Web Interface (Optional)**: Lightweight, ESP32-hosted page viewable on local networks
 
-![cwap-probe-03](https://user-images.githubusercontent.com/25306548/134974167-d0b1aaf1-dfc9-46ee-9513-271c3b876716.png)
+### System Block Diagram
 
-# ESP-IDF Environment Configuration
+```mermaid
+graph TD
+    A[Power Supply / USB] --> B[ESP32 Dev Module]
+    B --> C[Wi-Fi Sniffing (Promiscuous Mode)]
+    C --> D[Packet Filter: Probe Requests Only]
+    D --> E[Extract Source MAC Address]
+    E --> F[Serial Output / OLED / Web Interface]
+```
 
-This section might be outdated, checkout the [official site](https://esp-idf.readthedocs.io/en/latest/get-started/index.html) for more info and for the latest guide on how to get started with ESP-IDF.
+### Flow Diagram
 
-1. Setup Toolchain
+```mermaid
+flowchart TD
+    Start([Start]) --> Init[Initialize ESP32 & Serial Output]
+    Init --> SetWiFi[Configure Station Mode & Promiscuous Mode]
+    SetWiFi --> Listen[Capture Packets in Promiscuous Mode]
+    Listen --> Filter[Identify Probe Request Frames]
+    Filter --> Extract[Parse MAC Address from Header]
+    Extract --> Output[Send to Serial / OLED / Web Interface]
+    Output --> Listen
+```
 
-	- [Windows](https://docs.espressif.com/projects/esp-idf/en/latest/get-started/windows-setup.html)
-	- [Linux](https://docs.espressif.com/projects/esp-idf/en/latest/get-started/linux-setup.html)
-	- [Mac OS](https://docs.espressif.com/projects/esp-idf/en/latest/get-started/macos-setup.html)
-	
-2. Get ESP-IDF
+## Implementation Considerations
 
-	Besides the toolchain (that contains programs to compile and build the application), you also need ESP32 specific API / libraries.
+### Development Environment
 
-	   cd ~/esp
-	   git clone --recursive https://github.com/espressif/esp-idf.git
-		
-3. Checkout to version `v3.x`
+- PlatformIO or Arduino IDE
+- ESP32 Board Support Package (BSP)
+- **Required Libraries**: 
+  - `WiFi`
+  - `Adafruit_SSD1306` (optional)
+  - `ESPAsyncWebServer` (optional)
 
-	   cd esp-idf
-	   git checkout release/v3.2
-		
-4. Setup path to ESP-IDF
+### Technical Requirements
 
-	The toolchain programs access ESP-IDF using `IDF_PATH` environment variable.
-	This variable should be set up on your PC, otherwise projects will not build.
-	
-	- [Windows](https://docs.espressif.com/projects/esp-idf/en/latest/get-started/add-idf_path-to-profile.html#add-idf-path-to-profile-windows)
-	- [Linux & Mac OS](https://docs.espressif.com/projects/esp-idf/en/latest/get-started/add-idf_path-to-profile.html#add-idf-path-to-profile-linux-macos)
-	
-5. Install the Required Python Packages
+- Promiscuous mode must be explicitly enabled using the ESP32 WiFi library
+- A packet handler (callback) must parse 802.11 headers and filter for probe requests
+- MAC addresses should be formatted and output via chosen interface (Serial, OLED, Web)
 
-	   python -m pip install --user -r $IDF_PATH/requirements.txt
+### Performance and Power
 
-# Usage
-	
-1. Make sure you have exported the path
-	
-	   export IDF_PATH=~/esp/esp-idf
-	   export PATH=$PATH:$HOME/esp/xtensa-esp32-elf/bin
+- Can be powered via USB or battery (low consumption)
+- Real-time performance is sufficient for educational and light field use
 
-2. Clone the repo
-	
-	   git clone https://github.com/ETS-PoliTO/esp32-sniffer.git
-	   cd esp32-sniffer
+## Ethical and Legal Notes
 
-3. Establish serial connection between ESP32 and your PC
-	
-	   make menuconfig
+> **Important**: Captured packets are broadcast probe requests and do not involve decryption or active interference. Usage is aligned with ethical hacking guidelines and designed for passive, non-intrusive learning.
 
-	 Go to `Serial flasher config`, then `Default serial port` and set the port in which ESP32 is connected
-	 
-	 Note that, if you are using a bridge, probably you need to download some driver:
-	 
-	 - [CP210x](https://www.silabs.com/products/development-tools/software/usb-to-uart-bridge-vcp-drivers)
-	 - [FTDI](https://www.ftdichip.com/Drivers/VCP.htm)
-	 
-	 [This](https://docs.espressif.com/projects/esp-idf/en/latest/get-started/establish-serial-connection.html) provides a  guide on how establish serial connection between ESP32 and PC. 
+## Conclusion
 
-4. Build code and flash the ESP32
+This project presents a realistic, hands-on application of embedded systems in the realm of cybersecurity. The ESP32-based Wi-Fi probe sniffer offers:
 
-	   make all && make flash
+- ✅ Insight into the hidden side of everyday wireless communication
+- ✅ A low-cost, easy-to-build solution for education and demonstration purposes
+- ✅ A stepping stone into the fields of wireless security, penetration testing, and ethical hacking
 
-5. See logs
+By empowering users to safely explore Wi-Fi vulnerabilities, this system encourages a deeper understanding of network security principles while reinforcing embedded development skills.
 
-	   make monitor
-
-# File Configuration
-
-The file `/main/Kconfig.projbuild` contains two different menus:
-
-- SPIFFS (SPI Flash File System)
-
-	It contains some important information about the SPIFFS partion:
-	
-	- SPIFFS Base address
-	- SPIFFS Size
-	- SPIFFS Logical block size
-	- SPIFFS Logical page size
-	
-	[SPIFFS](https://docs.espressif.com/projects/esp-idf/en/latest/api-reference/storage/spiffs.html) is a file system that supports wear leveling, file system consistency checks and more.
-
-- Configurations
-
-	It contains different variables:
-
-	- `ESP32_ID`: ID of the ESP32
-	- `WIFI_SSID`: SSID of WiFi (network name)
-	- `WIFI_PASS`: WiFi password (WPA or WPA2)
-	- `BROKER_ADDR`: IP of the MQTT broker
-	- `BROKER_PSW`: password of the MQTT broker
-	- `BROKER_PORT`: port of the MQTT broker
-	- `CHANNEL`: channel in which ESP32 will sniff PROBE REQUEST
-	- `SNIFFING_TIME`: time of sniffing
-	- etc...
-
-### Variables Configuration
-
-In order to configure the variables above:
-
-1. Open your terminal within the project folder and run
-	
-       make menuconfig 
-	
-2. Select the menu you want to modify
-3. Edit variables as you like
-
-### Add Customised Menu
-
-You can also add different menus with different variables:
-
-1. Open `Kconfig.projbuild`
-2. Start a new menu
-
-       menu YOUR_MENU_NAME
-     
-3. Add the variables you need
-4. End menu
-
-       endmenu
-
-# Components
-
-- SPIFFS
-
-	You need to create a [partition table](https://docs.espressif.com/projects/esp-idf/en/latest/api-guides/partition-tables.html).
-	
-	[SPIFFS components](https://github.com/espressif/esp-idf/tree/master/components/spiffs)
-
-- ESP32 MQTT
-
-	It has been used ESP32 MQTT Library.
-	
-	[MQTT documentation](https://github.com/espressif/esp-mqtt/tree/c5ff6dd05fd357803f419916aa98ad7dd0f8e535)
-	
-- MD5
-
-	Hash function used on sniffed packets in order to get a unique identifier.
-
-# Resources
-
-- Official [esp-idf git repo](https://github.com/espressif/esp-idf) to see some examples and information about the used data structure.
-- Latest Documentation version for [Espressif IoT Development Framework](https://docs.espressif.com/projects/esp-idf/en/latest/).
-- [ESP32 forum](https://esp32.com/) to ask questions and find community resources.
-- [ESP32-IDF Documentation](http://esp32.info/docs/esp_idf/html/index.html) for browseable modules, namespaces, data structures and files.
-
-Check also this demonstration [video](https://youtu.be/NMywky9Ts_w) to see how ESP32 works.
-
-###### Seneca
-> Longum iter est per praecepta, breve et efficax per exempla
